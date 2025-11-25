@@ -1,0 +1,13 @@
+[project]
+name = "ph213f-finalproject"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "cupy-cuda12x>=13.6.0",
+    "ffmpeg>=1.4",
+    "matplotlib>=3.10.7",
+    "numpy>=2.3.4",
+    "pygame>=2.6.1",
+]
