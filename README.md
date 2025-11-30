@@ -101,13 +101,7 @@ Rendering frames: |##########--------------------|  33% (120/360)
 python wave_sim.py --n 2 --base-len 0.25 --mp4-fname carpet_depth2.mp4
 ```
 
-### 2.3. Example: Disable Video Saving (simulation only)
-
-```bash
-python wave_sim.py --save-mp4 0
-```
-
-### 2.4. All Command-Line Arguments
+### 2.3. All Command-Line Arguments
 
 All fields of the `WaveConfig` dataclass are exposed as CLI arguments. If an argument is omitted, the **default shown here** is used.
 
@@ -123,7 +117,6 @@ All fields of the `WaveConfig` dataclass are exposed as CLI arguments. If an arg
 | `--T`                | `float`            | `6.0`                                 | Total simulation time (in the same units as `c` and the domain).                       |
 | `--sponge-thickness` | `int`              | `28`                                  | Thickness (in grid cells) of the boundary damping layer.                               |
 | `--sponge-strength`  | `float`            | `2.0`                                 | Maximum damping coefficient in the sponge layer.                                       |
-| `--save-mp4`         | `int` (`0` or `1`) | `1`                                   | Whether to save an MP4 file (`1`) or not (`0`).                                        |
 | `--mp4-fname`        | `str`              | `"wave_centered_carpet_gpu_rect.mp4"` | Output MP4 filename.                                                                   |
 | `--fps`              | `int`              | `60`                                  | Frames per second of the output video.                                                 |
 | `--steps-per-frame`  | `int`              | `4`                                   | Number of simulation time steps per rendered video frame.                              |

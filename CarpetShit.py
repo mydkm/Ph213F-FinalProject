@@ -336,9 +336,6 @@ def parse_args():
                    help=f"Sponge thickness (cells), default {defaults.sponge_thickness}")
     p.add_argument("--sponge-strength", type=float, default=defaults.sponge_strength,
                    help=f"Sponge damping strength, default {defaults.sponge_strength}")
-    p.add_argument("--save-mp4", type=int, choices=[0, 1],
-                   default=int(defaults.save_mp4),
-                   help=f"Save MP4 (1) or not (0), default {int(defaults.save_mp4)}")
     p.add_argument("--mp4-fname", type=str, default=defaults.mp4_fname,
                    help=f"Output MP4 filename, default '{defaults.mp4_fname}'")
     p.add_argument("--fps", type=int, default=defaults.fps,
