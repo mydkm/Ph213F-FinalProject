@@ -1,6 +1,6 @@
 # Ph213F-FinalProject
 
-````markdown
+
 # 2D Wave Scattering on a Growing Carpet Fractal
 
 This repository contains a 2D finite-difference solver for the wave equation with:
