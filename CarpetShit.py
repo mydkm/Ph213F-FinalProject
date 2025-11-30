@@ -344,6 +344,17 @@ def parse_args():
                    help=f"Pulse Gaussian width, default {defaults.pulse_sigma}")
     p.add_argument("--pulse-amp", type=float, default=defaults.pulse_amp,
                    help=f"Pulse amplitude, default {defaults.pulse_amp}")
+    p.add_argument(
+        "--save-mp4", dest="save_mp4",
+        action="store_true",
+        default=defaults.save_mp4,
+        help=f"Save MP4 video (default: {defaults.save_mp4})"
+    )
+    p.add_argument(
+        "--no-save-mp4", dest="save_mp4",
+        action="store_false",
+        help="Disable MP4 saving"
+    )
 
     return p.parse_args()
 
@@ -361,7 +372,7 @@ if __name__ == "__main__":
         T=args.T,
         sponge_thickness=args.sponge_thickness,
         sponge_strength=args.sponge_strength,
-        save_mp4=bool(args.save_mp4),
+        save_mp4=args.save_mp4,
         mp4_fname=args.mp4_fname,
         fps=args.fps,
         steps_per_frame=args.steps_per_frame,
