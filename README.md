@@ -1,8 +1,6 @@
 # Ph213F-FinalProject
 
 
-# 2D Wave Scattering on a Growing Carpet Fractal
-
 This repository contains a 2D finite-difference solver for the wave equation with:
 
 - A **single point-source pulse** that generates a circular wave.
