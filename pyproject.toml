@@ -9,5 +9,4 @@ dependencies = [
     "ffmpeg>=1.4",
     "matplotlib>=3.10.7",
     "numpy>=2.3.4",
-    "pygame>=2.6.1",
 ]
