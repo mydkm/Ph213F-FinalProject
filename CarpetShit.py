@@ -21,24 +21,19 @@ from matplotlib.animation import FFMpegWriter
 from matplotlib.patches import Rectangle
 from dataclasses import dataclass
 
-# ========= Visualization controls =========
+# visualization settings
 COLOR_MODE = "height"         # "height" (|u|) or "signed" (u)
 COLORMAP   = "turbo"
 VIDEO_W, VIDEO_H = 1280, 720
 VIDEO_DPI = 160
-
-# Square appearance
 CARPET_FACE_RGBA    = (0.12, 0.08, 0.20, 0.95)
 CARPET_BORDER_COLOR = (1.0, 1.0, 1.0, 1.0)
 CARPET_BORDER_LW    = 3.0
-# ==========================================
 
 DTYPE = xp.float32
 def to_cpu(a): return _cp.asnumpy(a) if ON_GPU else a
 
-
-# ---------- Growing solid carpet with fixed base length ----------
-def solid_carpet_mask_growing_fixed(
+def sr_carpet_generation(
     N: int, n: int, base_len: float,
     Lx: float, Ly: float, dx: float, dy: float
 ):
@@ -106,8 +101,6 @@ def solid_carpet_mask_growing_fixed(
         level = next_level
 
     return open_mask, rects_phys
-# ---------------------------------------------------------------
-
 
 def sponge_damping(Nx, Ny, thickness=24, b_max=2.0):
     i = xp.arange(Nx, dtype=DTYPE)
@@ -121,7 +114,7 @@ def sponge_damping(Nx, Ny, thickness=24, b_max=2.0):
     return (b_max * xp.maximum(ramp(di), ramp(dj))).astype(DTYPE)
 
 
-# ---- Config (single-pulse point source kept) ----
+# waveconfig class
 @dataclass
 class WaveConfig:
     N: int = 540
@@ -145,7 +138,7 @@ class WaveConfig:
     pulse_amp: float = 1.0
 
 
-# ----- simple text progress bar for encoding -----
+# progress bar
 def make_progress_callback():
     def _cb(curr, total):
         # curr is 0-based
@@ -177,13 +170,14 @@ def run_sim(cfg: WaveConfig):
     Nt = int(np.ceil(cfg.T / dt))
 
     # use the new fixed-size growing carpet
-    open_mask, rects_phys = solid_carpet_mask_growing_fixed(
+    open_mask, rects_phys = sr_carpet_generation(
         N, cfg.n, cfg.base_len, Lx, Ly, dx, dy
     )
     obstacle = ~open_mask
     maskF = open_mask.astype(DTYPE)
     b = sponge_damping(N, N, thickness=cfg.sponge_thickness, b_max=cfg.sponge_strength)
 
+    # coefficients
     Cx2 = (c * dt / dx) ** 2
     Cy2 = (c * dt / dy) ** 2
 
@@ -256,7 +250,7 @@ def run_sim(cfg: WaveConfig):
 
     frames = int(np.ceil(Nt / cfg.steps_per_frame))
 
-    # --- UPDATED COLOR SCALING: robust percentile, not absolute max ---
+    # color scaling
     def update(_k):
         nonlocal u_nm1, u_n
         for _ in range(cfg.steps_per_frame):
@@ -305,11 +299,11 @@ def run_sim(cfg: WaveConfig):
 
         print("Saved:", cfg.mp4_fname, "| GPU compute:", ON_GPU, "| Encoder:", used)
     else:
-        # No file output, just run the animation (useful if not in Agg mode)
+        # don't know why anyone would need it, but wrote logic for it anyway
         print("Simulation finished (save_mp4=False, no video written).")
 
 
-# ----------- command-line interface for WaveConfig -----------
+# input args
 def parse_args():
     defaults = WaveConfig()  # dataclass instance with default values
     p = argparse.ArgumentParser(
