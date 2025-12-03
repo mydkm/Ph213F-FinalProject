@@ -17,9 +17,7 @@ The main script numerically integrates the damped 2D wave equation, visualizes t
 The “final” deliverable is a short MP4 video that shows:
 
 1. A circular wave emitted from a localized Gaussian pulse (point source).
-2. Propagation and interaction of the wave with a **square carpet fractal**:
-   - At depth `n = 1` there is a single centered square of side length `base_len`.
-   - At depth `n ≥ 2`, each square from the previous level spawns **8 smaller squares** around it (cardinal + diagonal directions), with a gap so they do not touch the parent square and side length reduced by a factor of 3 each level.
+2. Propagation and interaction of the wave with a **square/carpet fractal**.
 3. Outgoing waves are absorbed by a **sponge damping layer** near the domain boundaries to reduce reflections.
 4. A color-mapped representation of the displacement magnitude `|u(x, y, t)|` (or signed field, depending on `COLOR_MODE`).
 
@@ -133,10 +131,10 @@ All fields of the `WaveConfig` dataclass are exposed as CLI arguments. If an arg
 
 ## 3. References
 
-*(To be added.)*
-
 ```
 H. P. Langtangen and S. Linge, *Finite Difference Methods for Wave Equations*. Center for Biomedical Computing, Simula Research Laboratory, 2016. 
+```
 
+```
 J. Davidov, “Prompt to ChatGPT 5.1 requesting README.md generation,” ChatGPT 5.1 (large language model), OpenAI, prompt: “Can you write a README.md file for the repository containing the previous code in markdown formatting describing the following: -- 0. Description of the final 1. Setup of the project environment 2. Running the code and available input arguments 3. References (leave empty) --”, Dec. 2, 2025.
 ```
