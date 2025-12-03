@@ -4,7 +4,7 @@
 This repository contains a 2D finite-difference solver for the wave equation with:
 
 - A **single point-source pulse** that generates a circular wave.
-- A **growing, solid “carpet” obstacle** made of squares (a Sierpiński-style construction).
+- A **growing, solid obstacle** made of squares or triangles (a Sierpiński-style construction).
 - **Optional GPU acceleration** via CuPy (falls back to NumPy on CPU).
 - A **video renderer** (MP4 via FFmpeg) with a **terminal progress bar**.
 - A **CLI interface** exposing all simulation parameters.
@@ -136,5 +136,7 @@ All fields of the `WaveConfig` dataclass are exposed as CLI arguments. If an arg
 *(To be added.)*
 
 ```
-::contentReference[oaicite:0]{index=0}
+H. P. Langtangen and S. Linge, *Finite Difference Methods for Wave Equations*. Center for Biomedical Computing, Simula Research Laboratory, 2016. 
+
+J. Davidov, “Prompt to ChatGPT 5.1 requesting README.md generation,” ChatGPT 5.1 (large language model), OpenAI, prompt: “Can you write a README.md file for the repository containing the previous code in markdown formatting describing the following: -- 0. Description of the final 1. Setup of the project environment 2. Running the code and available input arguments 3. References (leave empty) --”, Dec. 2, 2025.
 ```
