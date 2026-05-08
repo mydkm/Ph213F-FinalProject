@@ -22,6 +22,8 @@ from matplotlib.animation import FFMpegWriter
 from matplotlib.patches import Polygon
 from dataclasses import dataclass
 
+# HI FROM BERTRAND
+
 # visualization settings
 COLOR_MODE = "height"         # "height" (|u|) or "signed" (u)
 COLORMAP   = "turbo"
