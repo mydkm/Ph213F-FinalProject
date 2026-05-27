@@ -3,13 +3,10 @@ import sys
 import argparse
 
 import numpy as _np
-try:
-    import cupy as _cp
-    xp = _cp
-    ON_GPU = True
-except Exception:
-    xp = _np
-    ON_GPU = False
+xp = _np
+
+ON_GPU = False
+DTYPE = xp.float32
 
 import numpy as np
 import matplotlib
@@ -24,15 +21,16 @@ from dataclasses import dataclass
 # visualization settings
 COLOR_MODE = "height"         # "height" (|u|) or "signed" (u)
 COLORMAP   = "turbo"
-VIDEO_W, VIDEO_H = 1280, 720
+VIDEO_W, VIDEO_H = 1920, 1080
 VIDEO_DPI = 160
 CARPET_FACE_RGBA    = (0.12, 0.08, 0.20, 0.95)
 CARPET_BORDER_COLOR = (1.0, 1.0, 1.0, 1.0)
 CARPET_BORDER_LW    = 3.0
 
 DTYPE = xp.float32
-def to_cpu(a): return _cp.asnumpy(a) if ON_GPU else a
-
+ENCODER = "libx264"  
+def to_cpu(a):
+    return a
 
 def sr_carpet_generation(
     N: int, n: int, base_len: float,
@@ -288,26 +286,16 @@ def run_sim(cfg: WaveConfig):
 
     if cfg.save_mp4:
         progress_cb = make_progress_callback()
-        used = None
-        for codec in ["h264_nvenc","hevc_nvenc","h264_qsv","hevc_qsv",
-                      "h264_vaapi","hevc_vaapi","h264_amf","hevc_amf"]:
-            try:
-                writer = FFMpegWriter(fps=cfg.fps, codec=codec, bitrate=4500,
-                                      extra_args=["-pix_fmt","yuv420p"])
-                ani.save(cfg.mp4_fname, dpi=VIDEO_DPI, writer=writer,
-                         progress_callback=progress_cb)
-                used = codec
-                break
-            except Exception:
-                continue
-        if used is None:
-            writer = FFMpegWriter(fps=cfg.fps, codec="libx264", bitrate=4500,
-                                  extra_args=["-pix_fmt","yuv420p"])
-            ani.save(cfg.mp4_fname, dpi=VIDEO_DPI, writer=writer,
-                     progress_callback=progress_cb)
-            used = "libx264"
+        writer = FFMpegWriter(
+            fps=cfg.fps,
+            codec="libx264",
+            bitrate=4500,
+            extra_args=["-pix_fmt", "yuv420p"],
+        )
+        ani.save(cfg.mp4_fname, dpi=VIDEO_DPI, writer=writer,
+                progress_callback=progress_cb)
 
-        print("Saved:", cfg.mp4_fname, "| GPU compute:", ON_GPU, "| Encoder:", used)
+        print("Saved:", cfg.mp4_fname, "| GPU compute:", ON_GPU, "| Encoder: libx264")
     else:
         print("Simulation finished (save_mp4=False, no video written).")
 
