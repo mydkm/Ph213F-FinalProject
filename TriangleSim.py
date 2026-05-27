@@ -15,20 +15,25 @@ from matplotlib.animation import FFMpegWriter
 from matplotlib.patches import Polygon
 from dataclasses import dataclass
 
-# HI FROM BERTRAND
 
 # -------------------------------------------------
 # Visualization settings
 # -------------------------------------------------
-COLOR_MODE = "height"         # "height" (|u|) or "signed" (u)
+COLOR_MODE = "height"         # "height" for |u|, or "signed" for u
 COLORMAP   = "turbo"
 
+# 1080p output
 VIDEO_W, VIDEO_H = 1920, 1080
-VIDEO_DPI = 160
+
+# Use 100 DPI so figsize=(19.2, 10.8) saves exactly 1920x1080.
+VIDEO_DPI = 100
 
 CARPET_FACE_RGBA    = (0.12, 0.08, 0.20, 0.95)
 CARPET_BORDER_COLOR = (1.0, 1.0, 1.0, 1.0)
-CARPET_BORDER_LW    = 3.0
+
+# Base border width. Smaller triangles scale down from this,
+# but are clamped to a minimum visible width later.
+CARPET_BORDER_LW = 3.0
 
 # CPU-only dtype
 DTYPE = np.float32
@@ -38,15 +43,20 @@ DTYPE = np.float32
 # Sierpinski-style triangle generation
 # -------------------------------------------------
 def sr_triangle_generation(
-    N: int, n: int, base_len: float,
-    Lx: float, Ly: float, dx: float, dy: float
+    N: int,
+    n: int,
+    base_len: float,
+    Lx: float,
+    Ly: float,
+    dx: float,
+    dy: float,
 ):
     """
     Construct a solid pattern of downward equilateral triangles.
 
     Returns
     -------
-    open_mask : np.bool_ [N, N]
+    open_mask : np.bool_ array, shape [N, N]
         True  -> fluid
         False -> obstacle
 
@@ -54,10 +64,11 @@ def sr_triangle_generation(
         Physical vertices of all triangles.
 
     tris_side : list[float]
-        Side length for each triangle.
+        Side length corresponding to each triangle.
     """
     if n < 1:
         raise ValueError("n must be >= 1")
+
     if base_len <= 0.0:
         raise ValueError("base_len must be positive")
 
@@ -101,6 +112,7 @@ def sr_triangle_generation(
 
         cond1 = (s1 >= 0) & (s2 >= 0) & (s3 >= 0)
         cond2 = (s1 <= 0) & (s2 <= 0) & (s3 <= 0)
+
         inside = cond1 | cond2
 
         sub = open_mask[i0:i1, j0:j1]
@@ -120,6 +132,7 @@ def sr_triangle_generation(
         v_right  = (cx + side / 2.0, cy +       h / 3.0)
 
         rasterize_triangle(v_bottom, v_left, v_right)
+
         tris_phys.append((v_bottom, v_left, v_right))
         tris_side.append(side)
 
@@ -177,9 +190,12 @@ def sponge_damping(Nx, Ny, thickness=24, b_max=2.0):
 # -------------------------------------------------
 @dataclass
 class WaveConfig:
+    # Recommended default for 1080p:
+    # N = 1080 gives roughly one vertical simulation cell per output pixel.
+    # For faster previews, use --N 540 or --N 720.
     N: int = 540
-    n: int = 1
 
+    n: int = 1
     base_len: float = 0.3
 
     Lx: float = 16 / 9
@@ -193,7 +209,8 @@ class WaveConfig:
     sponge_strength: float = 2.0
 
     save_mp4: bool = True
-    mp4_fname: str = "wave_sierpinski_triangle.mp4"
+    mp4_fname: str = "wave_sierpinski_triangle_cpu_1080p.mp4"
+
     fps: int = 60
     steps_per_frame: int = 4
 
@@ -245,7 +262,13 @@ def run_sim(cfg: WaveConfig):
 
     # Obstacle geometry
     open_mask, tris_phys, tris_side = sr_triangle_generation(
-        N, cfg.n, cfg.base_len, Lx, Ly, dx, dy
+        N,
+        cfg.n,
+        cfg.base_len,
+        Lx,
+        Ly,
+        dx,
+        dy,
     )
 
     obstacle = ~open_mask
@@ -264,13 +287,14 @@ def run_sim(cfg: WaveConfig):
 
     # Fields
     u_nm1 = np.zeros((N, N), dtype=DTYPE)
-    u_n   = np.zeros((N, N), dtype=DTYPE)
+    u_n = np.zeros((N, N), dtype=DTYPE)
 
     # Initial Gaussian pulse
     r2 = (X - cfg.pulse_x) ** 2 + (Y - cfg.pulse_y) ** 2
+
     u0 = (
         cfg.pulse_amp
-        * np.exp(-0.5 * r2 / (cfg.pulse_sigma ** 2))
+        * np.exp(-0.5 * r2 / (cfg.pulse_sigma**2))
     ).astype(DTYPE)
 
     u0 *= maskF
@@ -303,7 +327,7 @@ def run_sim(cfg: WaveConfig):
 
     u_n *= maskF
 
-    # Frameless canvas
+    # Frameless 1920x1080 canvas
     fig = plt.figure(
         figsize=(VIDEO_W / VIDEO_DPI, VIDEO_H / VIDEO_DPI),
         frameon=False,
@@ -324,19 +348,24 @@ def run_sim(cfg: WaveConfig):
         vmin0 = -A0
         vmax0 = A0
 
+    # Wave field:
+    # bilinear interpolation keeps the wave itself visually smooth.
     im = ax.imshow(
         frame0,
         origin="lower",
         extent=[0, Lx, 0, Ly],
         interpolation="bilinear",
+        resample=True,
         cmap=COLORMAP,
         vmin=vmin0,
         vmax=vmax0,
         aspect="equal",
     )
 
-    # Obstacle face overlay
+    # Obstacle face overlay:
+    # nearest interpolation and resample=False keep the obstacle mask crisp.
     overlay = np.zeros((N, N, 4), dtype=float)
+
     r, g, b_, a_ = CARPET_FACE_RGBA
 
     overlay[..., 3] = 0.0
@@ -350,16 +379,18 @@ def run_sim(cfg: WaveConfig):
         origin="lower",
         extent=[0, Lx, 0, Ly],
         interpolation="nearest",
+        resample=False,
         zorder=10,
         aspect="equal",
     )
 
-    # Triangle borders
+    # Triangle borders:
+    # Minimum linewidth increased to 1.0 for better 1080p visibility.
     for tri, side in zip(tris_phys, tris_side):
         v1, v2, v3 = tri
 
         lw = CARPET_BORDER_LW * (side / cfg.base_len)
-        lw = max(lw, 0.5)
+        lw = max(lw, 1.0)
 
         ax.add_patch(
             Polygon(
@@ -369,6 +400,8 @@ def run_sim(cfg: WaveConfig):
                 linewidth=lw,
                 edgecolor=CARPET_BORDER_COLOR,
                 zorder=20,
+                antialiased=False,
+                joinstyle="miter",
             )
         )
 
@@ -449,15 +482,20 @@ def run_sim(cfg: WaveConfig):
     if cfg.save_mp4:
         progress_cb = make_progress_callback()
 
-        # CPU-only software encoder.
-        # Removed GPU/hardware encoders:
-        # h264_nvenc, hevc_nvenc, h264_qsv, hevc_qsv,
-        # h264_vaapi, hevc_vaapi, h264_amf, hevc_amf
+        # CPU-only, high-quality software encoding.
+        # CRF controls quality:
+        #   18 is visually high quality,
+        #   16 is higher quality/larger file,
+        #   20-23 is smaller/lower quality.
         writer = FFMpegWriter(
             fps=cfg.fps,
             codec="libx264",
-            bitrate=4500,
-            extra_args=["-pix_fmt", "yuv420p"],
+            bitrate=-1,
+            extra_args=[
+                "-crf", "16",
+                "-preset", "slow",
+                "-pix_fmt", "yuv420p",
+            ],
         )
 
         ani.save(
@@ -467,7 +505,16 @@ def run_sim(cfg: WaveConfig):
             progress_callback=progress_cb,
         )
 
-        print("Saved:", cfg.mp4_fname, "| Compute: CPU | Encoder: libx264")
+        print(
+            "Saved:",
+            cfg.mp4_fname,
+            "| Compute: CPU",
+            "| Encoder: libx264",
+            "| Resolution:",
+            f"{VIDEO_W}x{VIDEO_H}",
+            "| N:",
+            cfg.N,
+        )
 
     else:
         print("Simulation finished using CPU only. No video written.")
@@ -483,63 +530,142 @@ def parse_args():
         description="CPU-only 2D wave simulation with Sierpinski-style triangle obstacle."
     )
 
-    p.add_argument("--N", type=int, default=defaults.N,
-                   help=f"Grid size (NxN), default {defaults.N}")
+    p.add_argument(
+        "--N",
+        type=int,
+        default=defaults.N,
+        help=(
+            f"Grid size NxN, default {defaults.N}. "
+            "For faster previews use 540 or 720. For crisp 1080p use 1080."
+        ),
+    )
 
-    p.add_argument("--n", type=int, default=defaults.n,
-                   help=f"Triangle depth level, default {defaults.n}")
+    p.add_argument(
+        "--n",
+        type=int,
+        default=defaults.n,
+        help=f"Triangle depth level, default {defaults.n}",
+    )
 
-    p.add_argument("--base-len", type=float, default=defaults.base_len,
-                   help=f"Side length of level-1 triangle, default {defaults.base_len}")
+    p.add_argument(
+        "--base-len",
+        type=float,
+        default=defaults.base_len,
+        help=f"Side length of level-1 triangle, default {defaults.base_len}",
+    )
 
-    p.add_argument("--Lx", type=float, default=defaults.Lx,
-                   help=f"Domain length in x, default {defaults.Lx}")
+    p.add_argument(
+        "--Lx",
+        type=float,
+        default=defaults.Lx,
+        help=f"Domain length in x, default {defaults.Lx}",
+    )
 
-    p.add_argument("--Ly", type=float, default=defaults.Ly,
-                   help=f"Domain length in y, default {defaults.Ly}")
+    p.add_argument(
+        "--Ly",
+        type=float,
+        default=defaults.Ly,
+        help=f"Domain length in y, default {defaults.Ly}",
+    )
 
-    p.add_argument("--c", type=float, default=defaults.c,
-                   help=f"Wave speed, default {defaults.c}")
+    p.add_argument(
+        "--c",
+        type=float,
+        default=defaults.c,
+        help=f"Wave speed, default {defaults.c}",
+    )
 
-    p.add_argument("--CFL", type=float, default=defaults.CFL,
-                   help=f"CFL factor, default {defaults.CFL}")
+    p.add_argument(
+        "--CFL",
+        type=float,
+        default=defaults.CFL,
+        help=f"CFL factor, default {defaults.CFL}",
+    )
 
-    p.add_argument("--T", type=float, default=defaults.T,
-                   help=f"Total simulation time, default {defaults.T}")
+    p.add_argument(
+        "--T",
+        type=float,
+        default=defaults.T,
+        help=f"Total simulation time, default {defaults.T}",
+    )
 
-    p.add_argument("--sponge-thickness", type=int, default=defaults.sponge_thickness,
-                   help=f"Sponge thickness in cells, default {defaults.sponge_thickness}")
+    p.add_argument(
+        "--sponge-thickness",
+        type=int,
+        default=defaults.sponge_thickness,
+        help=f"Sponge thickness in cells, default {defaults.sponge_thickness}",
+    )
 
-    p.add_argument("--sponge-strength", type=float, default=defaults.sponge_strength,
-                   help=f"Sponge damping strength, default {defaults.sponge_strength}")
+    p.add_argument(
+        "--sponge-strength",
+        type=float,
+        default=defaults.sponge_strength,
+        help=f"Sponge damping strength, default {defaults.sponge_strength}",
+    )
 
-    p.add_argument("--mp4-fname", type=str, default=defaults.mp4_fname,
-                   help=f"Output MP4 filename, default '{defaults.mp4_fname}'")
+    p.add_argument(
+        "--mp4-fname",
+        type=str,
+        default=defaults.mp4_fname,
+        help=f"Output MP4 filename, default '{defaults.mp4_fname}'",
+    )
 
-    p.add_argument("--fps", type=int, default=defaults.fps,
-                   help=f"Video frames per second, default {defaults.fps}")
+    p.add_argument(
+        "--fps",
+        type=int,
+        default=defaults.fps,
+        help=f"Video frames per second, default {defaults.fps}",
+    )
 
-    p.add_argument("--steps-per-frame", type=int, default=defaults.steps_per_frame,
-                   help=f"Simulation steps per video frame, default {defaults.steps_per_frame}")
+    p.add_argument(
+        "--steps-per-frame",
+        type=int,
+        default=defaults.steps_per_frame,
+        help=f"Simulation steps per video frame, default {defaults.steps_per_frame}",
+    )
 
-    p.add_argument("--pulse-x", type=float, default=defaults.pulse_x,
-                   help=f"Pulse center x, default {defaults.pulse_x}")
+    p.add_argument(
+        "--pulse-x",
+        type=float,
+        default=defaults.pulse_x,
+        help=f"Pulse center x, default {defaults.pulse_x}",
+    )
 
-    p.add_argument("--pulse-y", type=float, default=defaults.pulse_y,
-                   help=f"Pulse center y, default {defaults.pulse_y}")
+    p.add_argument(
+        "--pulse-y",
+        type=float,
+        default=defaults.pulse_y,
+        help=f"Pulse center y, default {defaults.pulse_y}",
+    )
 
-    p.add_argument("--pulse-sigma", type=float, default=defaults.pulse_sigma,
-                   help=f"Pulse Gaussian width, default {defaults.pulse_sigma}")
+    p.add_argument(
+        "--pulse-sigma",
+        type=float,
+        default=defaults.pulse_sigma,
+        help=f"Pulse Gaussian width, default {defaults.pulse_sigma}",
+    )
 
-    p.add_argument("--pulse-amp", type=float, default=defaults.pulse_amp,
-                   help=f"Pulse amplitude, default {defaults.pulse_amp}")
+    p.add_argument(
+        "--pulse-amp",
+        type=float,
+        default=defaults.pulse_amp,
+        help=f"Pulse amplitude, default {defaults.pulse_amp}",
+    )
 
-    p.add_argument("--save-mp4", dest="save_mp4", action="store_true",
-                   default=defaults.save_mp4,
-                   help="Save MP4 video. Default: enabled.")
+    p.add_argument(
+        "--save-mp4",
+        dest="save_mp4",
+        action="store_true",
+        default=defaults.save_mp4,
+        help=f"Save MP4 video, default {defaults.save_mp4}",
+    )
 
-    p.add_argument("--no-save-mp4", dest="save_mp4", action="store_false",
-                   help="Disable MP4 saving.")
+    p.add_argument(
+        "--no-save-mp4",
+        dest="save_mp4",
+        action="store_false",
+        help="Disable MP4 saving.",
+    )
 
     return p.parse_args()
 
