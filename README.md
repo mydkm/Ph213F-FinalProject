@@ -8,11 +8,11 @@ Both scripts render MP4 animations with Matplotlib and FFmpeg. They support auto
 
 ### Triangle, n=2
 
-<video src="Videos/Triangle_n2.mp4" controls width="100%"></video>
+[Watch Triangle n=2](Videos/Triangle_n2.mp4)
 
 ### Carpet, n=4
 
-<video src="Videos/Carpet_n4.mp4" controls width="100%"></video>
+[Watch Carpet n=4](Videos/Carpet_n4.mp4)
 
 ## Project Setup
 
