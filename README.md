@@ -8,11 +8,11 @@ Both scripts render MP4 animations with Matplotlib and FFmpeg. They support auto
 
 ### Triangle, n=2
 
-[Watch Triangle n=2](Videos/Triangle_n2.mp4)
+[Watch Triangle n=2](https://raw.githubusercontent.com/mydkm/Ph213F-FinalProject/main/Videos/Triangle_n2.mp4)
 
 ### Carpet, n=4
 
-[Watch Carpet n=4](Videos/Carpet_n4.mp4)
+[Watch Carpet n=4](https://raw.githubusercontent.com/mydkm/Ph213F-FinalProject/main/Videos/Carpet_n4.mp4)
 
 ## Project Setup
 
