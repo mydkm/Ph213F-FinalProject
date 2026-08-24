@@ -1,133 +1,103 @@
 # Ph213F-FinalProject
 
+This repository contains two standalone 2D finite-difference wave simulations. `CarpetSim.py` models a wave interacting with a square Sierpinski-style carpet obstacle, and `TriangleSim.py` models the same wave system with triangular fractal obstacles.
 
-This repository contains a 2D finite-difference solver for the wave equation with:
+Both scripts render MP4 animations with Matplotlib and FFmpeg. They support automatic CPU/GPU backend selection: by default, the scripts check whether CuPy can see a CUDA-capable GPU and use it when available; otherwise they fall back to NumPy.
 
-- A **single point-source pulse** that generates a circular wave.
-- A **growing, solid obstacle** made of squares or triangles (a Sierpiński-style construction).
-- **Optional GPU acceleration** via CuPy (falls back to NumPy on CPU).
-- A **video renderer** (MP4 via FFmpeg) with a **terminal progress bar**.
-- A **CLI interface** exposing all simulation parameters.
+## Example Outputs
 
-The main script numerically integrates the damped 2D wave equation, visualizes the resulting wave field, and writes an MP4 of the evolution.
+### Triangle, n=2
 
+<video src="Videos/Triangle_n2.mp4" controls width="100%"></video>
 
-## 0. Description of the Final
+### Carpet, n=4
 
-The “final” deliverable is a short MP4 video that shows:
+<video src="Videos/Carpet_n4.mp4" controls width="100%"></video>
 
-1. A circular wave emitted from a localized Gaussian pulse (point source).
-2. Propagation and interaction of the wave with a **square/carpet fractal**.
-3. Outgoing waves are absorbed by a **sponge damping layer** near the domain boundaries to reduce reflections.
-4. A color-mapped representation of the displacement magnitude `|u(x, y, t)|` (or signed field, depending on `COLOR_MODE`).
+## Project Setup
 
-The simulation supports **time-adaptive color scaling** (based on the 99th percentile of |u|) so that high-amplitude features remain visible throughout the video, even as the wave disperses and interacts with the obstacle.
+Requirements:
 
+- Python 3.11, matching `.python-version` and `pyproject.toml`
+- NumPy and Matplotlib
+- CuPy with CUDA 12.x support for GPU acceleration
+- FFmpeg available on `PATH` for MP4 output
 
-## 1. Project Setup
-
-### 1.1. Requirements
-
-- **Python** ≥ 3.9
-- **NumPy**
-- **Matplotlib**
-- **CuPy** (optional, for GPU acceleration on NVIDIA hardware)
-- **FFmpeg** (for MP4 encoding; must be available on your `PATH`)
-
-### 1.2. Install FFmpeg
-
-On Ubuntu / Debian:
+Install dependencies with `uv`:
 
 ```bash
-sudo apt-get update
+uv sync
+```
+
+If managing packages manually, install at least:
+
+```bash
+pip install numpy matplotlib cupy-cuda12x
+```
+
+Install FFmpeg separately, for example:
+
+```bash
 sudo apt-get install ffmpeg
-````
-
-On macOS (Homebrew):
-
-```bash
+# or
 brew install ffmpeg
 ```
 
-On Windows, download FFmpeg from the official builds and add the `bin/` folder to your `PATH`.
+## Running the Simulations
 
-### 1.3. Create and Activate a Virtual Environment (recommended)
-
-```bash
-python -m venv .venv
-source .venv/bin/activate        # Linux / macOS
-# .venv\Scripts\activate         # Windows PowerShell / CMD
-```
-
-### 1.4. Install Python Dependencies
-
-Minimal CPU-only setup:
+Run the carpet simulation:
 
 ```bash
-pip install numpy matplotlib
+uv run python CarpetSim.py --n 4 --mp4-fname carpet_n4.mp4
 ```
 
-Optional GPU acceleration (example for CUDA 12.x, adjust to your CUDA version):
+Run the triangle simulation:
 
 ```bash
-pip install cupy-cuda12x
+uv run python TriangleSim.py --n 2 --mp4-fname triangle_n2.mp4
 ```
 
-If CuPy fails to import, the code will automatically fall back to NumPy on CPU.
+Select the compute backend with `--compute`:
 
-> **Note:** There is no hard dependency on CuPy. If it is not installed or fails to import, `ON_GPU` becomes `False` and the simulation runs entirely on the CPU.
+- `--compute auto`: default; use CuPy if a CUDA device is available, otherwise NumPy.
+- `--compute cpu`: force NumPy CPU execution.
+- `--compute gpu`: require CuPy/CUDA and exit with an error if unavailable.
 
-## 2. Running the Code & Available Input Arguments
-
-Assume the main script is named `wave_sim.py`. If you saved it under a different filename, just replace `wave_sim.py` below with your actual filename.
-
-### 2.1. Basic Usage
+Quick CPU smoke test without saving video:
 
 ```bash
-python wave_sim.py
+uv run python CarpetSim.py --compute cpu --N 120 --T 0.1 --no-save-mp4
 ```
 
-This runs the simulation with the default `WaveConfig` parameters and writes an MP4 file (by default `wave_centered_carpet_gpu_rect.mp4`). While encoding, you will see a **progress bar** in the terminal, e.g.:
+## Common CLI Arguments
 
-```text
-Rendering frames: |##########--------------------|  33% (120/360)
-```
+Both scripts expose the same main simulation controls:
 
-### 2.2. Example: Change Carpet Depth and Output Name
+| Argument | Default | Description |
+| --- | --- | --- |
+| `--N` | `540` | Grid size, as an `N x N` domain. |
+| `--n` | `1` | Fractal depth level. |
+| `--base-len` | `0.3` | Base obstacle size in domain units. |
+| `--Lx`, `--Ly` | `16/9`, `1.0` | Physical domain dimensions. |
+| `--c` | `1.0` | Wave speed. |
+| `--CFL` | `0.45` | CFL safety factor for the timestep. |
+| `--T` | `6.0` | Total simulated time. |
+| `--sponge-thickness` | `28` | Boundary damping layer thickness in cells. |
+| `--sponge-strength` | `2.0` | Boundary damping strength. |
+| `--mp4-fname` | script-specific | Output video path. |
+| `--fps` | `60` | Output video frame rate. |
+| `--steps-per-frame` | `4` | Simulation timesteps per rendered frame. |
+| `--pulse-x`, `--pulse-y` | `0.22`, `0.50` | Initial pulse center. |
+| `--pulse-sigma` | `0.03` | Initial Gaussian pulse width. |
+| `--pulse-amp` | `1.0` | Initial pulse amplitude. |
+| `--compute` | `auto` | Backend selection: `auto`, `cpu`, or `gpu`. |
+| `--save-mp4`, `--no-save-mp4` | save enabled | Enable or disable MP4 writing. |
 
-```bash
-python wave_sim.py --n 2 --base-len 0.25 --mp4-fname carpet_depth2.mp4
-```
+Use `--help` on either script for the complete argument list.
 
-### 2.3. All Command-Line Arguments
+## Notes
 
-All fields of the `WaveConfig` dataclass are exposed as CLI arguments. If an argument is omitted, the **default shown here** is used.
-
-| Argument             | Type               | Default                               | Description                                                                            |
-| -------------------- | ------------------ | ------------------------------------- | -------------------------------------------------------------------------------------- |
-| `--N`                | `int`              | `540`                                 | Grid size (domain is `N × N` points). Larger = higher resolution and slower.           |
-| `--n`                | `int`              | `1`                                   | Carpet depth level. `1` = single centered square; higher `n` = more fractal squares.   |
-| `--base-len`         | `float`            | `0.3`                                 | Side length (in physical units) of the level-1 centered square.                        |
-| `--Lx`               | `float`            | `16/9` ≈ `1.7778`                     | Physical length of the domain in x (horizontal) direction.                             |
-| `--Ly`               | `float`            | `1.0`                                 | Physical length of the domain in y (vertical) direction.                               |
-| `--c`                | `float`            | `1.0`                                 | Wave speed used in the PDE.                                                            |
-| `--CFL`              | `float`            | `0.45`                                | CFL safety factor (time step = `CFL * dt_stable`). Must be < √0.5 for stability in 2D. |
-| `--T`                | `float`            | `6.0`                                 | Total simulation time (in the same units as `c` and the domain).                       |
-| `--sponge-thickness` | `int`              | `28`                                  | Thickness (in grid cells) of the boundary damping layer.                               |
-| `--sponge-strength`  | `float`            | `2.0`                                 | Maximum damping coefficient in the sponge layer.                                       |
-| `--mp4-fname`        | `str`              | `"wave_centered_carpet_gpu_rect.mp4"` | Output MP4 filename.                                                                   |
-| `--fps`              | `int`              | `60`                                  | Frames per second of the output video.                                                 |
-| `--steps-per-frame`  | `int`              | `4`                                   | Number of simulation time steps per rendered video frame.                              |
-| `--pulse-x`          | `float`            | `0.22`                                | x-coordinate of the pulse center (point source) in physical units.                     |
-| `--pulse-y`          | `float`            | `0.50`                                | y-coordinate of the pulse center.                                                      |
-| `--pulse-sigma`      | `float`            | `0.03`                                | Gaussian width of the initial pulse (controls spatial extent of the source).           |
-| `--pulse-amp`        | `float`            | `1.0`                                 | Amplitude of the initial displacement pulse.                                           |
-
-#### Notes
-
-* The **progress bar** only appears when `--save-mp4 1` (the default), because it uses the frame encoding callback from Matplotlib’s `FFMpegWriter`.
-* If FFmpeg is missing or a hardware codec is unavailable, the script automatically falls back to a CPU codec (`libx264`), as long as FFmpeg itself is installed.
-* `COLOR_MODE` and `COLORMAP` are configured at the top of the script. If you’d like to experiment with signed fields (`u` instead of `|u|`) or different colormaps, edit those constants.
+The wave field is shown with `COLOR_MODE = "height"` by default, which renders `|u(x, y, t)|`; set it to `"signed"` in the script to visualize signed displacement. `COLORMAP` controls the Matplotlib color map. Rendering still uses FFmpeg `libx264`, even when simulation math runs on the GPU.
 
 ## 3. References
 
@@ -138,3 +108,11 @@ H. P. Langtangen and S. Linge, *Finite Difference Methods for Wave Equations*. C
 ```
 J. Davidov, “Prompt to ChatGPT 5.1 requesting README.md generation,” ChatGPT 5.1 (large language model), OpenAI, prompt: “Can you write a README.md file for the repository containing the previous code in markdown formatting describing the following: -- 0. Description of the final 1. Setup of the project environment 2. Running the code and available input arguments 3. References (leave empty) --”, Dec. 2, 2025.
 ```
+
+```
+J. Davidov, “Codex session requesting README.md updates for CuPy backend selection and embedded simulation videos,” Codex (coding agent), OpenAI, prompt: “Can you rewrite the README.md file to accomodate these changes to the scripts? Do not alter the references already present in the README.md file, however add a reference to this Codex session in a similar style to the already present GPT citation. Also, can you add embeds for Videos/Triangle_n2.mp4 and Carpet_N4.mp4 into the new README.md file?”, Aug. 24, 2026.
+```
+
+## 8. Disclaimer
+
+This `README.md` file is slop, as it was auto-generated by ChatGPT 5.5 high during my last Codex session.

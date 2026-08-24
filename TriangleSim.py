@@ -15,6 +15,11 @@ from matplotlib.animation import FFMpegWriter
 from matplotlib.patches import Polygon
 from dataclasses import dataclass
 
+try:
+    import cupy as cp
+except Exception:
+    cp = None
+
 
 # -------------------------------------------------
 # Visualization settings
@@ -35,8 +40,30 @@ CARPET_BORDER_COLOR = (1.0, 1.0, 1.0, 1.0)
 # but are clamped to a minimum visible width later.
 CARPET_BORDER_LW = 3.0
 
-# CPU-only dtype
 DTYPE = np.float32
+
+
+def gpu_available():
+    if cp is None:
+        return False
+
+    try:
+        return cp.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        return False
+
+
+def resolve_backend(compute):
+    if compute == "cpu":
+        return np, False
+
+    if gpu_available():
+        return cp, True
+
+    if compute == "gpu":
+        raise SystemExit("GPU compute requested, but CuPy/CUDA device is unavailable.")
+
+    return np, False
 
 
 # -------------------------------------------------
@@ -219,6 +246,8 @@ class WaveConfig:
     pulse_sigma: float = 0.03
     pulse_amp: float = 1.0
 
+    compute: str = "auto"
+
 
 # -------------------------------------------------
 # Progress bar
@@ -246,15 +275,21 @@ def make_progress_callback():
 # Main simulation
 # -------------------------------------------------
 def run_sim(cfg: WaveConfig):
+    xp, using_gpu = resolve_backend(cfg.compute)
+    backend_name = "GPU (CuPy)" if using_gpu else "CPU (NumPy)"
+
+    def to_cpu(a):
+        return cp.asnumpy(a) if using_gpu else a
+
     N, Lx, Ly, c = cfg.N, cfg.Lx, cfg.Ly, cfg.c
 
-    x = np.linspace(0, Lx, N, dtype=DTYPE)
-    y = np.linspace(0, Ly, N, dtype=DTYPE)
+    dx = Lx / (N - 1)
+    dy = Ly / (N - 1)
 
-    dx = float(x[1] - x[0])
-    dy = float(y[1] - y[0])
+    x = xp.linspace(0, Lx, N, dtype=DTYPE)
+    y = xp.linspace(0, Ly, N, dtype=DTYPE)
 
-    X, Y = np.meshgrid(x, y, indexing="ij")
+    X, Y = xp.meshgrid(x, y, indexing="ij")
 
     dt_stable = 1.0 / (c * ((1.0 / dx**2 + 1.0 / dy**2) ** 0.5))
     dt = cfg.CFL * dt_stable
@@ -272,13 +307,15 @@ def run_sim(cfg: WaveConfig):
     )
 
     obstacle = ~open_mask
-    maskF = open_mask.astype(DTYPE)
+    maskF = xp.asarray(open_mask.astype(DTYPE))
 
-    b = sponge_damping(
-        N,
-        N,
-        thickness=cfg.sponge_thickness,
-        b_max=cfg.sponge_strength,
+    b = xp.asarray(
+        sponge_damping(
+            N,
+            N,
+            thickness=cfg.sponge_thickness,
+            b_max=cfg.sponge_strength,
+        )
     )
 
     # Coefficients
@@ -286,15 +323,15 @@ def run_sim(cfg: WaveConfig):
     Cy2 = (c * dt / dy) ** 2
 
     # Fields
-    u_nm1 = np.zeros((N, N), dtype=DTYPE)
-    u_n = np.zeros((N, N), dtype=DTYPE)
+    u_nm1 = xp.zeros((N, N), dtype=DTYPE)
+    u_n = xp.zeros((N, N), dtype=DTYPE)
 
     # Initial Gaussian pulse
     r2 = (X - cfg.pulse_x) ** 2 + (Y - cfg.pulse_y) ** 2
 
     u0 = (
         cfg.pulse_amp
-        * np.exp(-0.5 * r2 / (cfg.pulse_sigma**2))
+        * xp.exp(-0.5 * r2 / (cfg.pulse_sigma**2))
     ).astype(DTYPE)
 
     u0 *= maskF
@@ -339,14 +376,16 @@ def run_sim(cfg: WaveConfig):
 
     # Initial frame
     if COLOR_MODE == "height":
-        frame0 = np.abs(u_n).T
+        frame0 = xp.abs(u_n)
         vmin0 = 0.0
-        vmax0 = float(np.max(frame0)) or 1e-9
+        vmax0 = max(float(to_cpu(xp.max(frame0))), 1e-9)
+        frame0 = to_cpu(frame0.T)
     else:
-        frame0 = u_n.T
-        A0 = float(np.max(np.abs(frame0))) or 1e-9
+        frame0 = u_n
+        A0 = max(float(to_cpu(xp.max(xp.abs(frame0)))), 1e-9)
         vmin0 = -A0
         vmax0 = A0
+        frame0 = to_cpu(frame0.T)
 
     # Wave field:
     # bilinear interpolation keeps the wave itself visually smooth.
@@ -431,7 +470,7 @@ def run_sim(cfg: WaveConfig):
             + Cy2 * u_yy
         )
 
-        u_np1 = np.empty_like(u_n)
+        u_np1 = xp.empty_like(u_n)
 
         u_np1[1:-1, 1:-1] = denom * core
 
@@ -454,18 +493,16 @@ def run_sim(cfg: WaveConfig):
             u_nm1, u_n = u_n, u_np1
 
         if COLOR_MODE == "height":
-            u_abs = np.abs(u_n)
-            A = float(np.percentile(u_abs, 99.0))
-            A = max(A, 1e-9)
+            u_abs = xp.abs(u_n)
+            A = max(float(to_cpu(xp.percentile(u_abs, 99.0))), 1e-9)
 
-            im.set_data(u_abs.T)
+            im.set_data(to_cpu(u_abs.T))
             im.set_clim(0.0, A)
 
         else:
-            A = float(np.percentile(np.abs(u_n), 99.0))
-            A = max(A, 1e-9)
+            A = max(float(to_cpu(xp.percentile(xp.abs(u_n), 99.0))), 1e-9)
 
-            im.set_data(u_n.T)
+            im.set_data(to_cpu(u_n.T))
             im.set_clim(-A, A)
 
         return (im,)
@@ -482,7 +519,7 @@ def run_sim(cfg: WaveConfig):
     if cfg.save_mp4:
         progress_cb = make_progress_callback()
 
-        # CPU-only, high-quality software encoding.
+        # High-quality software encoding.
         # CRF controls quality:
         #   18 is visually high quality,
         #   16 is higher quality/larger file,
@@ -508,7 +545,8 @@ def run_sim(cfg: WaveConfig):
         print(
             "Saved:",
             cfg.mp4_fname,
-            "| Compute: CPU",
+            "| Compute:",
+            backend_name,
             "| Encoder: libx264",
             "| Resolution:",
             f"{VIDEO_W}x{VIDEO_H}",
@@ -517,7 +555,7 @@ def run_sim(cfg: WaveConfig):
         )
 
     else:
-        print("Simulation finished using CPU only. No video written.")
+        print(f"Simulation finished using {backend_name}. No video written.")
 
 
 # -------------------------------------------------
@@ -527,7 +565,7 @@ def parse_args():
     defaults = WaveConfig()
 
     p = argparse.ArgumentParser(
-        description="CPU-only 2D wave simulation with Sierpinski-style triangle obstacle."
+        description="CPU/GPU 2D wave simulation with Sierpinski-style triangle obstacle."
     )
 
     p.add_argument(
@@ -653,6 +691,13 @@ def parse_args():
     )
 
     p.add_argument(
+        "--compute",
+        choices=("auto", "cpu", "gpu"),
+        default=defaults.compute,
+        help=f"Compute backend: auto, cpu, or gpu. Default {defaults.compute}",
+    )
+
+    p.add_argument(
         "--save-mp4",
         dest="save_mp4",
         action="store_true",
@@ -695,6 +740,7 @@ if __name__ == "__main__":
         pulse_y=args.pulse_y,
         pulse_sigma=args.pulse_sigma,
         pulse_amp=args.pulse_amp,
+        compute=args.compute,
     )
 
     run_sim(cfg)
