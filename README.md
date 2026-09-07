@@ -8,7 +8,9 @@ Both scripts render MP4 animations with Matplotlib and FFmpeg. They support auto
 
 ### EOYS Video
 
-[![EOYS simulation preview](Videos/EOYS_FINAL_preview.gif)](Videos/EOYS_FINAL.mp4)
+<a href="Videos/EOYS_FINAL.mp4">
+  <img src="Videos/EOYS_FINAL_preview.gif" alt="EOYS simulation preview" width="100%">
+</a>
 
 [Watch the full EOYS MP4](Videos/EOYS_FINAL.mp4)
 
